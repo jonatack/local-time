@@ -1040,6 +1040,7 @@ elements."
                                         :object-type '(:struct timeval))))
           (values secs (* 1000 usecs)))))))
 
+#-ecl
 (defun %get-current-time ()
   "Cross-implementation abstraction to get the current time measured from the unix epoch (1/1/1970). Should return (values sec nano-sec)."
   #+(and allegro (not os-windows))
@@ -1093,6 +1094,26 @@ elements."
              ;; CL's get-universal-time uses an epoch of 1/1/1900, so adjust the result to the Unix epoch
              #.(encode-universal-time 0 0 0 1 1 1970 0))
           0))
+
+#+ecl
+(progn
+  (cffi:defctype time_t :long)
+  (cffi:defctype seconds_t :int)
+
+  (cffi:defcstruct timeval
+    (tv_sec time_t)
+    (tv_usec seconds_t))
+
+  (cffi:defcfun gettimeofday :int
+    (timeval :pointer)
+    (pointer :pointer))
+
+  (defun %get-current-time ()
+    "Get the current time measured from the unix epoch (1/1/1970). Returns (values sec nano-sec)."
+    (cffi:with-foreign-object (tv '(:struct timeval))
+      (gettimeofday tv (cffi::null-pointer))
+      (values (cffi:mem-ref tv 'time_t)
+              (* 1000 (cffi:mem-ref tv 'seconds_t (cffi:foreign-type-size 'time_t)))))))
 
 (defvar *clock* t
   "Use the `*clock*' special variable if you need to define your own idea of the current time.
